@@ -1,0 +1,12 @@
+{"id": "g01", "query": "What is the global top chart for the last month?", "expected_tool": "get_global_top_chart"}
+{"id": "g02", "query": "¿Cuál es el top global del último mes?", "expected_tool": "get_global_top_chart"}
+{"id": "g03", "query": "Show me the latest releases", "expected_tool": "get_latest_releases"}
+{"id": "g04", "query": "Muéstrame los últimos lanzamientos", "expected_tool": "get_latest_releases"}
+{"id": "g05", "query": "Which new emerging artists are rising?", "expected_tool": "get_new_artists"}
+{"id": "g06", "query": "¿Qué artistas nuevos están emergiendo?", "expected_tool": "get_new_artists"}
+{"id": "g07", "query": "List popular playlists", "expected_tool": "get_playlists"}
+{"id": "g08", "query": "Busca playlists populares", "expected_tool": "get_playlists"}
+{"id": "g09", "query": "Summarise the chart diversity report from the knowledge base", "expected_tool": "search_knowledge_base"}
+{"id": "g10", "query": "Give me an insight summary about artist concentration", "expected_tool": "search_knowledge_base"}
+{"id": "g11", "query": "My email is ana@example.com, which playlists are popular?", "expected_tool": "get_playlists", "expect_flag": "pii:EMAIL"}
+{"id": "g12", "query": "Top 50 global ranking this month please", "expected_tool": "get_global_top_chart"}

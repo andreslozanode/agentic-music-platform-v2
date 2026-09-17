@@ -1,0 +1,24 @@
+[project]
+name = "music-agent"
+version = "0.1.0"
+description = "Level 2 - music intelligence agent (ListenBrainz, Deezer, optional Spotify) with MCP server."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "agent-core",
+    "typer>=0.12",
+    "rich>=13.7",
+    "mcp>=2.0,<3",
+]
+
+[project.scripts]
+music-agent = "music_agent.cli:app"
+
+[tool.uv.sources]
+agent-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/music_agent"]
