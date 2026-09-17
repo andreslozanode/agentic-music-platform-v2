@@ -1,0 +1,32 @@
+environment: staging
+cloud: gcp
+image:
+  digest: ""              # set by the CD workflow: --set image.digest=sha256:...
+serviceAccount:
+  annotations:
+    iam.gke.io/gcp-service-account: agentic-staging@PROJECT_ID.iam.gserviceaccount.com
+config:
+  agent:
+    storageRoot: gs://agentic-staging-lakehouse/lake
+    qdrantUrl: https://qdrant.staging.internal.example.org:6333
+    jwtJwksUrl: https://login.example.org/.well-known/jwks.json
+    jwtIssuer: https://login.example.org/
+    jwtAudience: agentic-api
+secrets:
+  externalSecrets:
+    enabled: true
+    remoteKeyPrefix: agentic-staging
+persistence:
+  storageClass: standard-rwx
+ingress:
+  enabled: true
+  host: agentic.staging.example.org
+  tlsSecretName: agentic-staging-tls
+networkPolicy:
+  egress:
+    gkeMetadataServer: true
+monitoring:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true

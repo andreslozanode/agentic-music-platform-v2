@@ -1,0 +1,38 @@
+# Ephemeral kind cluster used by .github/workflows/e2e.yml
+environment: ci
+cloud: local
+image:
+  registry: ""
+  repository: agentic-api
+  tag: ci
+  pullPolicy: Never
+config:
+  llm:
+    provider: heuristic
+    model: offline
+  music:
+    mode: fixtures
+  agent:
+    vectorBackend: server
+    qdrantUrl: http://agentic-qdrant:6333
+    embeddingProvider: hashing
+  logLevel: DEBUG
+api:
+  replicas: 1
+  autoscaling:
+    enabled: false
+  pdb:
+    enabled: false
+cycle:
+  schedule: "*/30 * * * *"
+qdrant:
+  internal:
+    enabled: true
+    storage: 1Gi
+persistence:
+  accessMode: ReadWriteOnce
+  size: 1Gi
+networkPolicy:
+  ingressNamespaces: []
+  egress:
+    externalHttps: false

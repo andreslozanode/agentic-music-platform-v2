@@ -1,0 +1,59 @@
+{{- if .Values.cycle.enabled }}
+{{- $sel := dict "root" . "component" "cycle" -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "agentic.fullname" . }}-cycle
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentic.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cycle
+spec:
+  schedule: {{ .Values.cycle.schedule | quote }}
+  timeZone: {{ .Values.cycle.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: {{ .Values.cycle.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cycle.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.cycle.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.cycle.activeDeadlineSeconds }}
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "agentic.metaLabels" . | nindent 12 }}
+            {{- include "agentic.selector" $sel | nindent 12 }}
+            {{- with .Values.podLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ include "agentic.serviceAccountName" . }}
+          automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
+          enableServiceLinks: false
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: cycle
+              image: {{ include "agentic.apiImage" . }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args: ["run-cycle", "--log-level", "{{ .Values.config.logLevel }}"]
+              env:
+                {{- include "agentic.env" . | nindent 16 }}
+              envFrom:
+                {{- include "agentic.envFrom" . | nindent 16 }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              resources:
+                {{- toYaml .Values.cycle.resources | nindent 16 }}
+              volumeMounts:
+                {{- include "agentic.volumeMounts" . | nindent 16 }}
+          volumes:
+            {{- include "agentic.volumes" . | nindent 12 }}
+{{- end }}

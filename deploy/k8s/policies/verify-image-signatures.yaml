@@ -1,0 +1,46 @@
+# Only images signed keylessly by this repository's release workflow may run.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: agentic-verify-image-signatures
+  annotations:
+    policies.kyverno.io/title: Verify cosign keyless signatures and SLSA provenance
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: verify-signature-and-provenance
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaceSelector:
+                matchLabels:
+                  agentic.example.org/signed-images-only: "true"
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/agentic-ai-platform/*"
+          mutateDigest: true
+          verifyDigest: true
+          required: true
+          attestors:
+            - entries:
+                - keyless:
+                    subjectRegExp: "^https://github.com/agentic-ai-platform/agentic-ai-platform/\\.github/workflows/release\\.yml@refs/(heads/main|tags/v.*)$"
+                    issuer: "https://token.actions.githubusercontent.com"
+                    rekor:
+                      url: https://rekor.sigstore.dev
+          attestations:
+            - type: https://slsa.dev/provenance/v1
+              attestors:
+                - entries:
+                    - keyless:
+                        subjectRegExp: "^https://github.com/agentic-ai-platform/agentic-ai-platform/\\.github/workflows/release\\.yml@refs/(heads/main|tags/v.*)$"
+                        issuer: "https://token.actions.githubusercontent.com"
+              conditions:
+                - all:
+                    - key: "{{ buildDefinition.externalParameters.workflow.repository }}"
+                      operator: Equals
+                      value: "https://github.com/agentic-ai-platform/agentic-ai-platform"

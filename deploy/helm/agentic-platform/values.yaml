@@ -1,0 +1,182 @@
+# Secure-by-default values. Environment files (values-ci/-staging/-prod.yaml) override.
+
+environment: dev          # dev | ci | staging | prod  (drives the governance policy)
+cloud: local              # local | aws | gcp | azure  (single cloud toggle)
+
+image:
+  registry: ghcr.io
+  repository: agentic-ai-platform/agentic-api
+  tag: ""                 # defaults to .Chart.AppVersion
+  digest: ""              # preferred in staging/prod: sha256:... (signed by CI)
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  # Workload identity (no static cloud keys):
+  #   aws:   eks.amazonaws.com/role-arn: arn:aws:iam::<acct>:role/agentic
+  #   gcp:   iam.gke.io/gcp-service-account: agentic@<project>.iam.gserviceaccount.com
+  #   azure: azure.workload.identity/client-id: <client-id>
+  annotations: {}
+  automountToken: false
+
+podLabels: {}             # azure: azure.workload.identity/use: "true"
+podAnnotations: {}
+
+config:
+  llm:
+    provider: anthropic   # anthropic | openai_compatible (heuristic is rejected by policy in prod)
+    model: claude-sonnet-5
+    baseUrl: ""
+    maxTokens: 1500
+  music:
+    mode: live
+  agent:
+    storageRoot: /var/lib/agentic/lakehouse
+    storageOptionsJson: "{}"
+    vectorBackend: server
+    qdrantUrl: ""
+    collection: music_insights
+    embeddingProvider: fastembed
+    embeddingModel: BAAI/bge-small-en-v1.5
+    embeddingDim: 384
+    embeddingBaseUrl: ""
+    jwtJwksUrl: ""
+    jwtIssuer: ""
+    jwtAudience: ""
+    rateLimitPerMinute: 60
+    maxBodyBytes: 16384
+    otelEndpoint: ""
+  logLevel: INFO
+  extraEnv: []
+
+secrets:
+  # Mounted as files (never env vars) at /var/run/secrets/agentic. Key names = setting names:
+  # LLM_API_KEY, AGENT_AUDIT_HMAC_KEY, AGENT_API_KEYS, AGENT_QDRANT_API_KEY,
+  # AGENT_EMBEDDING_API_KEY, MUSIC_LISTENBRAINZ_TOKEN, MUSIC_SPOTIFY_CLIENT_ID,
+  # MUSIC_SPOTIFY_CLIENT_SECRET
+  existingSecret: agentic-secrets
+  externalSecrets:
+    enabled: false
+    secretStoreRef:
+      name: cloud-secret-store
+      kind: ClusterSecretStore
+    refreshInterval: 1h
+    remoteKeyPrefix: agentic
+    keys:
+      - LLM_API_KEY
+      - AGENT_AUDIT_HMAC_KEY
+      - AGENT_API_KEYS
+      - AGENT_QDRANT_API_KEY
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  privileged: false
+  capabilities:
+    drop: ["ALL"]
+
+api:
+  replicas: 2
+  port: 8080
+  metricsPort: 9464
+  terminationGracePeriodSeconds: 30
+  resources:
+    requests: { cpu: 250m, memory: 768Mi, ephemeral-storage: 256Mi }
+    limits: { cpu: "1", memory: 1536Mi, ephemeral-storage: 1Gi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  pdb:
+    enabled: true
+    minAvailable: 1
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+cycle:
+  enabled: true
+  schedule: "0 */6 * * *"
+  timeZone: Etc/UTC
+  activeDeadlineSeconds: 1200
+  backoffLimit: 1
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  resources:
+    requests: { cpu: 250m, memory: 768Mi, ephemeral-storage: 256Mi }
+    limits: { cpu: "1", memory: 1536Mi, ephemeral-storage: 1Gi }
+
+musicMcp:
+  enabled: false
+  replicas: 1
+  port: 8000
+  image:
+    repository: agentic-ai-platform/music-mcp
+    tag: ""
+    digest: ""
+  allowedHosts: []        # Host header values, e.g. ["music-mcp.agentic.svc:8000"]
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+qdrant:
+  internal:
+    enabled: false        # CI/dev only; use managed or HA Qdrant in staging/prod
+    image: qdrant/qdrant:v1.15.4-unprivileged
+    storage: 5Gi
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { cpu: "1", memory: 1Gi }
+
+persistence:
+  enabled: true
+  # Shared by API replicas and the CronJob (audit files are per pod; approvals are shared).
+  accessMode: ReadWriteMany
+  size: 10Gi
+  storageClass: ""
+  existingClaim: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tlsSecretName: ""
+  annotations: {}
+
+networkPolicy:
+  enabled: true
+  ingressNamespaces: [ingress-nginx]
+  monitoringNamespaces: [monitoring]
+  egress:
+    externalHttps: true   # 443 to public IPs only (private ranges and metadata excluded)
+    gkeMetadataServer: false
+    extra: []             # additional raw egress rules
+
+monitoring:
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+  prometheusRule:
+    enabled: false
+
+tests:
+  enabled: true

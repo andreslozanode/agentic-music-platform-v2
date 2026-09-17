@@ -1,0 +1,47 @@
+environment: prod
+cloud: gcp
+image:
+  digest: ""              # CD sets the signed digest; tags are never deployed to prod
+serviceAccount:
+  annotations:
+    iam.gke.io/gcp-service-account: agentic-prod@PROJECT_ID.iam.gserviceaccount.com
+config:
+  agent:
+    storageRoot: gs://agentic-prod-lakehouse/lake
+    qdrantUrl: https://qdrant.prod.internal.example.org:6333
+    jwtJwksUrl: https://login.example.org/.well-known/jwks.json
+    jwtIssuer: https://login.example.org/
+    jwtAudience: agentic-api
+    rateLimitPerMinute: 30
+  logLevel: INFO
+secrets:
+  externalSecrets:
+    enabled: true
+    remoteKeyPrefix: agentic-prod
+api:
+  replicas: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+  pdb:
+    minAvailable: 2
+persistence:
+  storageClass: standard-rwx
+  size: 20Gi
+ingress:
+  enabled: true
+  host: agentic.example.org
+  tlsSecretName: agentic-prod-tls
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/proxy-body-size: 16k
+networkPolicy:
+  egress:
+    gkeMetadataServer: true
+monitoring:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+tests:
+  enabled: false

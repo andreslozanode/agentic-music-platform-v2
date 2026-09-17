@@ -1,0 +1,13 @@
+# Ephemeral e2e cluster (.github/workflows/e2e.yml). kindnetd enforces NetworkPolicy
+# since kind v0.24, so the chart's default-deny rules are exercised in CI.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: agentic-e2e
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiServer:
+          extraArgs:
+            enable-admission-plugins: NodeRestriction

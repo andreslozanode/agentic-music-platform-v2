@@ -1,0 +1,6 @@
+{{ include "agentic.fullname" . }} deployed to {{ .Release.Namespace }} (environment={{ .Values.environment }}, cloud={{ .Values.cloud }}).
+
+API:      kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "agentic.fullname" . }}-api 8080:{{ .Values.service.port }}
+Tests:    helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+Cycle:    kubectl -n {{ .Release.Namespace }} create job --from=cronjob/{{ include "agentic.fullname" . }}-cycle manual-cycle
+Verify:   python skills/deploy-quality-gates/scripts/post_deploy_verify.py --base-url http://127.0.0.1:8080 --api-key <reader-key>

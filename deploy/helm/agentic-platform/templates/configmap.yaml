@@ -1,0 +1,56 @@
+{{- $a := .Values.config.agent -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "agentic.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentic.labels" . | nindent 4 }}
+data:
+  ENVIRONMENT: {{ .Values.environment | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  LLM_PROVIDER: {{ .Values.config.llm.provider | quote }}
+  LLM_MODEL: {{ .Values.config.llm.model | quote }}
+  LLM_MAX_TOKENS: {{ .Values.config.llm.maxTokens | quote }}
+  {{- with .Values.config.llm.baseUrl }}
+  LLM_BASE_URL: {{ . | quote }}
+  {{- end }}
+  MUSIC_MODE: {{ .Values.config.music.mode | quote }}
+  AGENT_CLOUD: {{ .Values.cloud | quote }}
+  AGENT_STORAGE_ROOT: {{ $a.storageRoot | quote }}
+  AGENT_STORAGE_OPTIONS_JSON: {{ $a.storageOptionsJson | quote }}
+  AGENT_STATE_DIR: /var/lib/agentic/state
+  AGENT_POLICY_PATH: /etc/agentic/policy/policy.yaml
+  AGENT_VECTOR_BACKEND: {{ $a.vectorBackend | quote }}
+  AGENT_QDRANT_URL: {{ include "agentic.qdrantUrl" . | quote }}
+  AGENT_COLLECTION: {{ $a.collection | quote }}
+  AGENT_EMBEDDING_PROVIDER: {{ $a.embeddingProvider | quote }}
+  AGENT_EMBEDDING_MODEL: {{ $a.embeddingModel | quote }}
+  AGENT_EMBEDDING_DIM: {{ $a.embeddingDim | quote }}
+  {{- with $a.embeddingBaseUrl }}
+  AGENT_EMBEDDING_BASE_URL: {{ . | quote }}
+  {{- end }}
+  {{- if $a.jwtJwksUrl }}
+  AGENT_JWT_JWKS_URL: {{ $a.jwtJwksUrl | quote }}
+  AGENT_JWT_ISSUER: {{ required "config.agent.jwtIssuer is required with JWKS" $a.jwtIssuer | quote }}
+  AGENT_JWT_AUDIENCE: {{ required "config.agent.jwtAudience is required with JWKS" $a.jwtAudience | quote }}
+  {{- end }}
+  AGENT_RATE_LIMIT_PER_MINUTE: {{ $a.rateLimitPerMinute | quote }}
+  AGENT_MAX_BODY_BYTES: {{ $a.maxBodyBytes | quote }}
+  AGENT_METRICS_PORT: {{ .Values.api.metricsPort | quote }}
+  {{- with $a.otelEndpoint }}
+  AGENT_OTEL_ENDPOINT: {{ . | quote }}
+  {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "agentic.fullname" . }}-policy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentic.labels" . | nindent 4 }}
+  annotations:
+    agentic.example.org/policy-sha256: {{ .Files.Get "files/policy.yaml" | sha256sum }}
+data:
+  policy.yaml: |-
+{{ .Files.Get "files/policy.yaml" | indent 4 }}

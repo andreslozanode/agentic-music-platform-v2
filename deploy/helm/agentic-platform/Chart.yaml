@@ -1,0 +1,11 @@
+apiVersion: v2
+name: agentic-platform
+description: Governed autonomous music-intelligence agent (API, autonomous CronJob, optional MCP server and Qdrant)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.29.0-0"
+keywords: [ai-agents, rag, governance, langgraph, qdrant]
+maintainers:
+  - name: platform-team
+    email: platform@example.org

@@ -1,0 +1,95 @@
+{{- if .Values.qdrant.internal.enabled }}
+{{- $sel := dict "root" . "component" "qdrant" -}}
+{{- $q := .Values.qdrant.internal -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "agentic.fullname" . }}-qdrant
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentic.labels" . | nindent 4 }}
+    app.kubernetes.io/component: qdrant
+spec:
+  serviceName: {{ include "agentic.fullname" . }}-qdrant
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "agentic.selector" $sel | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "agentic.metaLabels" . | nindent 8 }}
+        {{- include "agentic.selector" $sel | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 2000
+        fsGroup: 3000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: qdrant
+          image: {{ $q.image }}
+          env:
+            - name: QDRANT__TELEMETRY_DISABLED
+              value: "true"
+            - name: QDRANT_INIT_FILE_PATH
+              value: /qdrant/init/.qdrant-initialized
+          ports:
+            - name: http
+              containerPort: 6333
+            - name: grpc
+              containerPort: 6334
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 15
+          resources:
+            {{- toYaml $q.resources | nindent 12 }}
+          volumeMounts:
+            - name: storage
+              mountPath: /qdrant/storage
+            - name: snapshots
+              mountPath: /qdrant/snapshots
+            - name: init
+              mountPath: /qdrant/init
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: snapshots
+          emptyDir: {}
+        - name: init
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: storage
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ $q.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "agentic.fullname" . }}-qdrant
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentic.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "agentic.selector" $sel | nindent 4 }}
+  ports:
+    - name: http
+      port: 6333
+      targetPort: http
+{{- end }}

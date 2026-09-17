@@ -1,0 +1,23 @@
+{
+  "skill_name": "deploy-quality-gates",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We're about to ship the FastAPI agent to staging with Helm. Add whatever checks we need before, during and after the rollout, and make it roll back automatically if things go wrong.",
+      "expected_output": "Uses pre_deploy_gate.sh before building, deploy_watch.py with --rollback during helm upgrade, post_deploy_verify.py after; explains thresholds and produces a GO/NO-GO report.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "is it safe to ship? here are the CI artifacts in reports/ — pre-deploy.jsonl says secrets failed but everything else passed",
+      "expected_output": "Runs gate_report.py, returns NO-GO, explains that a leaked secret must be rotated before purging history, and does not suggest allowlisting it.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Write a GitHub Actions job that smoke tests our production LLM API after deploy, including checking that prompt injection is blocked and that the docs page is not exposed.",
+      "expected_output": "Job invoking post_deploy_verify.py with --api-key from a reader-only secret, --expect-docs-disabled, uploads JSON/JUnit evidence and appends gate_report output to the step summary.",
+      "files": []
+    }
+  ]
+}

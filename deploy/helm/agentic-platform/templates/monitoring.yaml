@@ -1,0 +1,59 @@
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "agentic.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentic.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: api
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+{{- end }}
+{{- if .Values.monitoring.prometheusRule.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "agentic.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentic.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: agentic.governance
+      rules:
+        - alert: AgenticCycleFailed
+          expr: increase(agent_autonomous_cycles_total{outcome="failed"}[6h]) > 0
+          labels: { severity: warning }
+          annotations:
+            summary: Autonomous cycle failed (data quality, timeout or source outage)
+        - alert: AgenticDataQualityFailure
+          expr: increase(agent_data_quality_failures_total[6h]) > 0
+          labels: { severity: warning }
+          annotations:
+            summary: Critical data-quality check blocked promotion to silver/gold
+        - alert: AgenticGuardrailSpike
+          expr: sum(rate(agent_guardrail_events_total{rule="input.prompt_injection"}[15m])) > 0.2
+          for: 10m
+          labels: { severity: critical }
+          annotations:
+            summary: Prompt-injection attempts spiking - possible attack
+        - alert: AgenticHighLatency
+          expr: histogram_quantile(0.95, sum(rate(agent_request_seconds_bucket[10m])) by (le)) > 20
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: p95 agent latency above 20s
+        - alert: AgenticFallbackRate
+          expr: sum(rate(agent_requests_total{status="fallback"}[30m])) / clamp_min(sum(rate(agent_requests_total[30m])), 1e-9) > 0.2
+          for: 30m
+          labels: { severity: warning }
+          annotations:
+            summary: More than 20% of answers fail grounding/output policy
+{{- end }}

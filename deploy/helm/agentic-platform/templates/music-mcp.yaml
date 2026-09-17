@@ -1,0 +1,87 @@
+{{- if .Values.musicMcp.enabled }}
+{{- $sel := dict "root" . "component" "music-mcp" -}}
+{{- $m := .Values.musicMcp -}}
+{{- $svcHost := printf "%s-music-mcp.%s.svc:%v" (include "agentic.fullname" .) .Release.Namespace $m.port -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agentic.fullname" . }}-music-mcp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentic.labels" . | nindent 4 }}
+    app.kubernetes.io/component: music-mcp
+spec:
+  replicas: {{ $m.replicas }}
+  selector:
+    matchLabels:
+      {{- include "agentic.selector" $sel | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "agentic.metaLabels" . | nindent 8 }}
+        {{- include "agentic.selector" $sel | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "agentic.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mcp
+          image: {{ include "agentic.imageRef" (dict "image" $m.image "registry" .Values.image.registry "env" .Values.environment "appVersion" .Chart.AppVersion) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - mcp
+            - --transport=streamable-http
+            - --host=0.0.0.0
+            - --port={{ $m.port }}
+            - --allowed-host={{ $svcHost }}
+            {{- range $m.allowedHosts }}
+            - --allowed-host={{ . }}
+            {{- end }}
+          ports:
+            - name: mcp
+              containerPort: {{ $m.port }}
+          env:
+            - name: MUSIC_MODE
+              value: {{ .Values.config.music.mode | quote }}
+            - name: AGENTIC_SECRETS_DIR
+              value: /var/run/secrets/agentic
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          readinessProbe:
+            tcpSocket: { port: mcp }
+            periodSeconds: 10
+          resources:
+            {{- toYaml $m.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: secrets
+              mountPath: /var/run/secrets/agentic
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: secrets
+          secret:
+            secretName: {{ include "agentic.secretName" . }}
+            defaultMode: 0440
+            optional: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "agentic.fullname" . }}-music-mcp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentic.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "agentic.selector" $sel | nindent 4 }}
+  ports:
+    - name: mcp
+      port: {{ $m.port }}
+      targetPort: mcp
+{{- end }}

@@ -1,0 +1,73 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: agentic-workload-hardening
+  annotations:
+    policies.kyverno.io/title: Hardened workloads for agentic namespaces
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-read-only-root-and-limits
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaceSelector:
+                matchLabels:
+                  agentic.example.org/signed-images-only: "true"
+      validate:
+        message: "Containers must use a read-only root filesystem, drop ALL capabilities and set CPU/memory limits."
+        pattern:
+          spec:
+            =(automountServiceAccountToken): false
+            containers:
+              - securityContext:
+                  readOnlyRootFilesystem: true
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop: ["ALL"]
+                resources:
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"
+    - name: disallow-mutable-tags
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaceSelector:
+                matchLabels:
+                  agentic.example.org/signed-images-only: "true"
+      validate:
+        message: "Images must be referenced by digest (@sha256:...)."
+        foreach:
+          - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.image }}"
+                    operator: NotEquals
+                    value: "*@sha256:*"
+    - name: disallow-env-secrets
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaceSelector:
+                matchLabels:
+                  agentic.example.org/signed-images-only: "true"
+      validate:
+        message: "Secrets must be mounted as files, not injected as environment variables."
+        foreach:
+          - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.envFrom[].secretRef || `[]` | length(@) }}"
+                    operator: GreaterThan
+                    value: 0
+                  - key: "{{ element.env[].valueFrom.secretKeyRef || `[]` | length(@) }}"
+                    operator: GreaterThan
+                    value: 0
