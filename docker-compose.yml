@@ -1,0 +1,78 @@
+# Local stack: Qdrant + governed API (+ optional GPU Ollama, MCP server).
+#   docker compose up --build
+#   docker compose --profile local-llm up --build     # use a local model on an NVIDIA GPU
+name: agentic-ai-platform
+
+x-hardening: &hardening
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  tmpfs: ["/tmp:size=64m"]
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    ports: ["127.0.0.1:6333:6333"]
+    volumes: ["qdrant-data:/qdrant/storage"]
+    environment:
+      QDRANT__TELEMETRY_DISABLED: "true"
+
+  api:
+    <<: *hardening
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+      args: { PACKAGE: autonomous-agent }
+    command: ["serve", "--port", "8080"]
+    ports: ["127.0.0.1:8080:8080", "127.0.0.1:9464:9464"]
+    env_file: [.env]
+    environment:
+      ENVIRONMENT: dev
+      AGENT_VECTOR_BACKEND: server
+      AGENT_QDRANT_URL: http://qdrant:6333
+    volumes: ["agentic-state:/var/lib/agentic"]
+    depends_on: [qdrant]
+
+  cycle:
+    <<: *hardening
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+      args: { PACKAGE: autonomous-agent }
+    command: ["run-cycle", "--loop"]
+    env_file: [.env]
+    environment:
+      ENVIRONMENT: dev
+      AGENT_VECTOR_BACKEND: server
+      AGENT_QDRANT_URL: http://qdrant:6333
+      AGENT_CYCLE_INTERVAL_S: "3600"
+      POD_NAME: cycle
+    volumes: ["agentic-state:/var/lib/agentic"]
+    depends_on: [qdrant]
+
+  music-mcp:
+    <<: *hardening
+    profiles: ["mcp"]
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+      args: { PACKAGE: music-agent }
+    command: ["mcp", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8000",
+              "--allowed-host", "localhost:8000", "--allowed-host", "127.0.0.1:8000"]
+    ports: ["127.0.0.1:8000:8000"]
+    env_file: [.env]
+
+  ollama:
+    image: ollama/ollama:0.12.6
+    profiles: ["local-llm"]
+    ports: ["127.0.0.1:11434:11434"]
+    volumes: ["ollama-models:/root/.ollama"]
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
+
+volumes:
+  qdrant-data:
+  agentic-state:
+  ollama-models:

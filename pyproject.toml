@@ -1,0 +1,118 @@
+[project]
+name = "agentic-ai-platform"
+version = "0.1.0"
+description = "Three-level agentic AI monorepo: Reddit agent, music intelligence agent and a governed autonomous agent."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "agent-core",
+    "reddit-agent",
+    "music-agent",
+    "autonomous-agent",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "respx>=0.21",
+    "hypothesis>=6.100",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "types-PyYAML>=6.0",
+    "bandit[sarif]>=1.8",
+    "pip-audit>=2.7",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*", "agents/*"]
+
+[tool.uv.sources]
+agent-core = { workspace = true }
+reddit-agent = { workspace = true }
+music-agent = { workspace = true }
+autonomous-agent = { workspace = true }
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = [
+    "packages/agent-core/src",
+    "agents/level1-reddit-agent/src",
+    "agents/level2-music-agent/src",
+    "agents/level3-autonomous-agent/src",
+]
+extend-exclude = ["skills/*/evals"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "S", "A", "C4", "SIM", "RUF", "ASYNC", "PT", "TRY", "PL"]
+ignore = [
+    "PLR0913",  # agents legitimately take many collaborators
+    "PLR2004",  # magic values are fine in tests/metrics thresholds
+    "TRY003",   # descriptive exception messages
+    "PLR0911",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106", "PLR2004", "S311", "ASYNC240"]
+"skills/**/scripts/**" = ["S603", "S607", "T201"]
+"**/governance/guardrails.py" = ["E501", "RUF001"]
+"**/api/app.py" = ["PLR0915"]
+"**/cli.py" = ["B008", "PLC0415"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+pretty = true
+mypy_path = [
+    "packages/agent-core/src",
+    "agents/level1-reddit-agent/src",
+    "agents/level2-music-agent/src",
+    "agents/level3-autonomous-agent/src",
+]
+explicit_package_bases = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["deltalake.*", "pyarrow.*", "fastembed.*", "opentelemetry.exporter.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = [
+    "packages/agent-core/tests",
+    "agents/level1-reddit-agent/tests",
+    "agents/level2-music-agent/tests",
+    "agents/level3-autonomous-agent/tests",
+    "skills/deploy-quality-gates/tests",
+]
+addopts = "-ra --strict-markers --import-mode=importlib"
+markers = [
+    "integration: requires live network credentials (skipped in CI by default)",
+    "security: security-focused regression tests",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+branch = true
+source = ["agent_core", "reddit_agent", "music_agent", "autonomous_agent"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 80
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
